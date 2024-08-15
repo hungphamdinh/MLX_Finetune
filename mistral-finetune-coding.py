@@ -36,10 +36,10 @@ instructions_string = f"""CodeGPT, your role is to assist with coding problems b
 prompt_builder = lambda prompt: f'''<s>[INST] {instructions_string} \n{prompt} \n[/INST]\n'''
 
 model_path = "mlx-community/Mistral-7B-Instruct-v0.2-4bit"
-prompt = prompt_builder("How do I write a unit test in Python?")
-max_tokens = 140
+prompt = prompt_builder("Generate some React Native unit test in React Native")
+max_tokens = 300
 
-# Load the model and generate a response
+# # Load the model and generate a response
 model, tokenizer = load("mlx-community/Mistral-7B-Instruct-v0.2-4bit")
 response = generate(model, tokenizer, prompt=prompt, max_tokens=max_tokens, verbose=True)
 
@@ -64,7 +64,7 @@ command = ['python', 'scripts/lora-coding.py', '--model', model_path, '--adapter
 run_command_with_live_output(command)
 
 # A more complex coding prompt
-complex_prompt = "How do I handle asynchronous operations in Python?"
+complex_prompt = "Generate the React Native unit test for item in listView"
 prompt = prompt_builder(complex_prompt)
 command = ['python', 'scripts/lora-coding.py', '--model', model_path, '--adapter-file', adapter_path, '--max-tokens', max_tokens_str, '--prompt', prompt]
 
