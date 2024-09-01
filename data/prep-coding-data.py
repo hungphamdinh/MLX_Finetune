@@ -4,8 +4,8 @@ import json
 from data import coding_prompts, coding_answers
 
 # Set the number of test and validation examples
-num_test = 2
-num_val = 2
+num_test = 5
+num_val = 5
 
 
 # New prompt format for coding helper

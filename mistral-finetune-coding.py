@@ -1,3 +1,5 @@
+# # Run the command and print results continuously
+# run_command_with_live_output(command)
 import subprocess
 from mlx_lm import load, generate
 
@@ -30,43 +32,82 @@ def run_command_with_live_output(command: list[str]) -> None:
 def construct_shell_command(command: list[str]) -> str:
     return str(command).replace("'","").replace("[","").replace("]","").replace(",","")
 
-# Coding assistant prompt format
-instructions_string = f"""CodeGPT, your role is to assist with coding problems by providing clear and accurate solutions. Your responses should be concise, technical, and helpful. Sign off each response with '-CodeGPT'."""
+def run_model_without_fine_tuning(prompt: str, max_tokens: int, model_path: str) -> None:
+    """
+    Load and run the model without fine-tuning.
 
-prompt_builder = lambda prompt: f'''<s>[INST] {instructions_string} \n{prompt} \n[/INST]\n'''
+    Args:
+        prompt (str): The prompt to generate the response.
+        max_tokens (int): Maximum number of tokens for the generated response.
+        model_path (str): Path to the pre-trained model.
 
+    Returns:
+        None
+    """
+    model, tokenizer = load(model_path)
+    response = generate(model, tokenizer, prompt=prompt, max_tokens=max_tokens, verbose=True)
+    print("Generated response:", response)
+
+def fine_tune_model(model_path: str, num_iters: str, steps_per_eval: str, val_batches: str, learning_rate: str, num_layers: int) -> None:
+    """
+    Fine-tune the model using LoRA.
+
+    Args:
+        model_path (str): Path to the pre-trained model.
+        num_iters (str): Number of iterations for fine-tuning.
+        steps_per_eval (str): Steps per evaluation.
+        val_batches (str): Number of validation batches.
+        learning_rate (str): Learning rate for fine-tuning.
+        num_layers (int): Number of layers to fine-tune.
+
+    Returns:
+        None
+    """
+    command = [
+        'python', 'scripts/lora-coding.py', '--model', model_path, '--train', 
+        '--iters', num_iters, '--steps-per-eval', steps_per_eval, 
+        '--val-batches', val_batches, '--learning-rate', learning_rate, 
+        '--lora-layers', str(num_layers), '--test'
+    ]
+    print(construct_shell_command(command))
+    run_command_with_live_output(command)
+
+def run_model_after_fine_tuning(prompt: str, max_tokens: int, model_path: str, adapter_path: str) -> None:
+    """
+    Run the model after fine-tuning using the LoRA adapter.
+
+    Args:
+        prompt (str): The prompt to generate the response.
+        max_tokens (int): Maximum number of tokens for the generated response.
+        model_path (str): Path to the pre-trained model.
+        adapter_path (str): Path to the fine-tuned adapter.
+
+    Returns:
+        None
+    """
+    command = [
+        'python', 'scripts/lora-coding.py', '--model', model_path, 
+        '--adapter-file', adapter_path, '--max-tokens', str(max_tokens), '--prompt', prompt
+    ]
+    run_command_with_live_output(command)
+
+# Example usage:
+
+# Parameters
 model_path = "mlx-community/Mistral-7B-Instruct-v0.2-4bit"
+instructions_string = f"""CodeGPT, your role is to assist with coding problems by providing clear and accurate solutions. Your responses should be concise, technical, and helpful. Sign off each response with '-CodeGPT'."""
+prompt_builder = lambda prompt: f'''<s>[INST] {instructions_string} \n{prompt} \n[/INST]\n'''
 prompt = prompt_builder("Generate the unit test for listView with import { renderScreen } from '@Mock/mockApp'")
 max_tokens = 1000
+adapter_path = "adapters.npz"  # Path to the LoRA adapter
 
-# # Load the model and generate a response
-model, tokenizer = load("mlx-community/Mistral-7B-Instruct-v0.2-4bit")
-response = generate(model, tokenizer, prompt=prompt, max_tokens=max_tokens, verbose=True)
+# Run model without fine-tuning
+# run_model_without_fine_tuning(prompt, max_tokens, model_path)
 
-# Fine-tune with LoRA
-num_iters = "100"
-steps_per_eval = "10"
-val_batches = "-1"  # Use all validation batches
-learning_rate = "1e-5"  # Default learning rate
-num_layers = 16  # Default number of layers to fine-tune
+# Fine-tune the model // run script inside
+# fine_tune_model(model_path, num_iters="100", steps_per_eval="10", val_batches="-1", learning_rate="1e-5", num_layers=16)
 
-command = ['python', 'scripts/lora-coding.py', '--model', model_path, '--train', '--iters', num_iters, '--steps-per-eval', steps_per_eval, '--val-batches', val_batches, '--learning-rate', learning_rate, '--lora-layers', num_layers, '--test']
+# Run model after fine-tuning
+run_model_after_fine_tuning(prompt, max_tokens, model_path, adapter_path)
 
-# Print the command to run in the command line directly
-print(construct_shell_command(command))
 
-# Run inference with the fine-tuned model
-adapter_path = "adapters.npz"  # Default adapter path
-max_tokens_str = str(max_tokens)
-
-# Define the command for running inference
-command = ['python', 'scripts/lora-coding.py', '--model', model_path, '--adapter-file', adapter_path, '--max-tokens', max_tokens_str, '--prompt', prompt]
-run_command_with_live_output(command)
-
-# A more complex coding prompt
-complex_prompt = "Generate the unit test for listView with import { renderScreen } from '@Mock/mockApp'"
-prompt = prompt_builder(complex_prompt)
-command = ['python', 'scripts/lora-coding.py', '--model', model_path, '--adapter-file', adapter_path, '--max-tokens', max_tokens_str, '--prompt', prompt]
-
-# Run the command and print results continuously
-run_command_with_live_output(command)

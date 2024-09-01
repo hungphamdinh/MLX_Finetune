@@ -27,6 +27,7 @@ class ModelArgs:
         if self.num_key_value_heads is None:
             self.num_key_value_heads = self.num_attention_heads
 
+        # un-command if use mistral
         if self.rope_scaling:
             required_keys = {"factor", "type"}
             if not all(key in self.rope_scaling for key in required_keys):
@@ -145,6 +146,7 @@ class Attention(nn.Module):
         self.k_proj = nn.Linear(dim, n_kv_heads * head_dim, bias=False)
         self.v_proj = nn.Linear(dim, n_kv_heads * head_dim, bias=False)
         self.o_proj = nn.Linear(n_heads * head_dim, dim, bias=False)
+        # rope_scale = 1 #unCommand if use Mistral
         rope_scale = (
             1 / args.rope_scaling["factor"]
             if args.rope_scaling is not None and args.rope_scaling["type"] == "linear"
