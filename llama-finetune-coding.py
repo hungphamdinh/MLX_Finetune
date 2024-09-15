@@ -1,7 +1,6 @@
-# # Run the command and print results continuously
-# run_command_with_live_output(command)
 import subprocess
 from mlx_lm import load, generate
+
 
 # Function to run a shell command with live output
 def run_command_with_live_output(command: list[str]) -> None:
@@ -48,8 +47,7 @@ def run_model_without_fine_tuning(prompt: str, max_tokens: int, model_path: str)
     response = generate(model, tokenizer, prompt=prompt, max_tokens=max_tokens, verbose=True)
     print("Generated response:", response)
 
-def fine_tune_model(model_path: str, num_iters: str, steps_per_eval: str, val_batches: str, learning_rate: str, num_layers: int, resume_adapter_file: str = None  # Optional argument to resume training
-                    ) -> None:
+def fine_tune_model(model_path: str, num_iters: str, steps_per_eval: str, val_batches: str, learning_rate: str, num_layers: int) -> None:
     """
     Fine-tune the model using LoRA.
 
@@ -70,10 +68,6 @@ def fine_tune_model(model_path: str, num_iters: str, steps_per_eval: str, val_ba
         '--val-batches', val_batches, '--learning-rate', learning_rate, 
         '--lora-layers', str(num_layers), '--test'
     ]
-
-    if resume_adapter_file:
-        command.extend(['--resume-adapter-file', resume_adapter_file])
-        
     print(construct_shell_command(command))
     run_command_with_live_output(command)
 
@@ -97,23 +91,23 @@ def run_model_after_fine_tuning(prompt: str, max_tokens: int, model_path: str, a
     run_command_with_live_output(command)
 
 # Example usage:
-code = "import React from 'react';\nimport { Image, Text } from '@Elements';\nimport { ImageResource } from '@Themes';\nimport styled from 'styled-components/native';\n\nconst Wrapper = styled.View`\n  justify-content: center;\n  align-items: center;\n  flex: 1;\n  margin-top: 80px;\n`;\n\nconst Content = styled(Text)`\n  color: #505e75;\n  font-weight: bold;\n  font-size: 13px;\n`;\n\nconst EmptyList = () => (\n  <Wrapper>\n    <Image testID=\"image\" source={ImageResource.IMG_LIBRARY_EMPTY} />\n    <Content testID=\"text\" text=\"AD_EFORM_NO_IMAGES_AVAILABLE\" />\n  </Wrapper>\n);\n\nexport default EmptyList;\n"
 
 # Parameters
-model_path = "mlx-community/Mistral-7B-Instruct-v0.2-4bit"
+model_path = "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"
 instructions_string = f"""CodeGPT, your role is to assist with coding problems by providing clear and accurate solutions. Your responses should be concise, technical, and helpful. Sign off each response with '-CodeGPT'."""
 prompt_builder = lambda prompt: f'''<s>[INST] {instructions_string} \n{prompt} \n[/INST]\n'''
-prompt = prompt_builder("Generate the unit test for these code <code-start>" + code + "<code-end>'")
+prompt = prompt_builder("Generate the unit test for listView with import { renderScreen } from '@Mock/mockApp'")
 max_tokens = 1000
 adapter_path = "adapters.npz"  # Path to the LoRA adapter
 
 # Run model without fine-tuning
-# run_model_without_fine_tuning(prompt, max_tokens, model_path)
+run_model_without_fine_tuning(prompt, max_tokens, model_path)
 
 # Fine-tune the model // run script inside
-fine_tune_model(model_path, num_iters="100", steps_per_eval="10", val_batches="-1", learning_rate="1e-5", num_layers=16, resume_adapter_file="./adapters.npz")
+# fine_tune_model(model_path, num_iters="100", steps_per_eval="10", val_batches="-1", learning_rate="1e-5", num_layers=16)
 
 # Run model after fine-tuning
-# run_model_after_fine_tuning(prompt, max_tokens, model_path, adapter_path)
+run_model_after_fine_tuning(prompt, max_tokens, model_path, adapter_path)
+
 
 
