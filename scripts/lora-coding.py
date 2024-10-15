@@ -128,7 +128,7 @@ class Dataset:
     Light-weight wrapper to hold lines from a jsonl file
     """
 
-    def __init__(self, path: Path, key: str = "prompt"):
+    def __init__(self, path: Path, key: str = "text"):
         if not path.exists():
             self._data = None
         else:

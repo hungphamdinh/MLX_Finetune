@@ -7,26 +7,32 @@ from transformers import AutoTokenizer
 # Set random seed for reproducibility
 random.seed(42)
 
-# Instructions and signature
+# Instructions for the model
 instructions_string = (
     "You are CodeGPT, an AI assistant specializing in generating unit tests for JavaScript and React Native code. "
     "Provide clear, concise, and correct unit tests using Jest and React Testing Library. "
     "Ensure the tests cover various cases and follow best practices."
 )
-signature = '-CodeGPT'
-
 
 # Root directory containing your JavaScript projects
-ROOT_DIR = './trainning_data'  # <-- Update this path
+ROOT_DIR = './training_data_2'  # Corrected path spelling from 'trainning_data' to 'training_data'
 
-tokenizer = AutoTokenizer.from_pretrained('mlx-community/Mistral-7B-Instruct-v0.2-4bit') #ensure the tokens not exceed the limitation of model
-MAX_SEQUENCE_LENGTH = 1024
+# Initialize the tokenizer
+tokenizer = AutoTokenizer.from_pretrained('mlx-community/Mistral-7B-Instruct-v0.2-4bit')  # Ensure tokens do not exceed model limitations
+
+MAX_SEQUENCE_LENGTH = 1400  # Maximum tokens per 'text' entry
 
 def get_basename(file_path):
-    # Extract the base name without extension
+    """
+    Extracts the base name of a file without its extension.
+    """
     return os.path.basename(file_path).split('.')[0]
 
 def load_code_and_tests():
+    """
+    Loads code and corresponding test files from the ROOT_DIR.
+    Returns lists of code snippets, unit test snippets, and component names.
+    """
     # Collect code files (excluding test files)
     code_files = glob.glob(os.path.join(ROOT_DIR, '**', '*.js'), recursive=True)
     code_files = [f for f in code_files if not f.endswith(('.test.js', '.spec.js')) and '__tests__' not in f]
@@ -77,73 +83,53 @@ def load_code_and_tests():
 
     return code_snippets, unit_test_snippets, component_names
 
-
 def generate_examples(code_snippets, unit_test_snippets, component_names):
+    """
+    Generates a single 'text' field by combining the prompt and answer.
+    Each 'text' consists of the instructions, the code snippet, and the unit test, clearly separated.
+    If the combined token count exceeds MAX_SEQUENCE_LENGTH, the example is skipped.
+    """
     examples = []
     for code_snippet, unit_test_snippet, component_name in zip(code_snippets, unit_test_snippets, component_names):
-        code_chunks = split_text_into_chunks(code_snippet, MAX_SEQUENCE_LENGTH // 2)
-        unit_test_chunks = split_text_into_chunks(unit_test_snippet, MAX_SEQUENCE_LENGTH // 2)
-        
-        num_parts = max(len(code_chunks), len(unit_test_chunks))
-        
-        for i in range(num_parts):
-            # Handle Code Chunks
-            code_chunk = code_chunks[i] if i < len(code_chunks) else ''
-            if code_chunk:
-                prompt_code = (
-                    f"<s>[INST] {instructions_string}\n"
-                    f"Generate a unit test for the following React Native component ("
-                    f"{component_name} - Part {i + 1} - Code):\n"
-                    f"```javascript\n{code_chunk}\n```\n[/INST]"
-                )
-                answer_code = f"{signature}"
-                examples.append({"prompt": prompt_code, "answer": answer_code})
-            
-            # Handle Unit Test Chunks
-            unit_test_chunk = unit_test_chunks[i] if i < len(unit_test_chunks) else ''
-            if unit_test_chunk:
-                prompt_test = (
-                    f"<s>[INST] {instructions_string}\n"
-                    f"Review and improve the following unit test for React Native component ("
-                    f"{component_name} - Part {i + 1} - Unit Test):\n"
-                    f"```javascript\n{unit_test_chunk}\n```\n[/INST]"
-                )
-                answer_test = f"{signature}"
-                examples.append({"prompt": prompt_test, "answer": answer_test})
+        # Construct the combined text with clear separators
+        combined_text = (
+            f"{instructions_string}\n\n"
+            f"Generate a unit test for the following React Native component (`{component_name}`):\n"
+            f"```javascript\n{code_snippet}\n```\n\n"
+            f"Unit Test:\n"
+            f"```javascript\n{unit_test_snippet}\n```"
+        )
+
+        # Calculate token counts
+        combined_tokens = len(tokenizer.encode(combined_text))
+        if combined_tokens > MAX_SEQUENCE_LENGTH:
+            print(f"Skipping `{component_name}` as it exceeds the maximum token limit ({combined_tokens} tokens).")
+            continue  # Skip examples that exceed the token limit
+
+        examples.append({"text": combined_text})
+
     return examples
 
-def split_text_into_chunks(text, max_length, overlap=50):
-    tokens = tokenizer.encode(text)
-    chunks = []
-    for i in range(0, len(tokens), max_length - overlap):
-        chunk_tokens = tokens[i:i + max_length]
-        chunk_text = tokenizer.decode(chunk_tokens, skip_special_tokens=True)
-        chunks.append(chunk_text)
-    return chunks
-
-def split_dataset(examples, num_test=1, num_val=1):
-    # Shuffle the examples
+def split_dataset_dynamic(examples, test_ratio=0.1, val_ratio=0.1):
+    """
+    Dynamically splits the dataset into training, validation, and test sets based on ratios.
+    """
     random.shuffle(examples)
-
     total_examples = len(examples)
-    if num_test + num_val > total_examples:
-        raise ValueError("The sum of num_test and num_val exceeds the total number of examples.")
 
-    # Randomly select indices for test and validation sets
-    test_val_indices = random.sample(range(total_examples), num_test + num_val)
-    test_indices = test_val_indices[:num_test]
-    val_indices = test_val_indices[num_test:]
+    test_size = int(total_examples * test_ratio)
+    val_size = int(total_examples * val_ratio)
 
-    # Create test and validation sets
-    test_examples = [examples[i] for i in test_indices]
-    val_examples = [examples[i] for i in val_indices]
-
-    # Remove test and validation examples from the main list to create the training set
-    train_examples = [example for idx, example in enumerate(examples) if idx not in test_val_indices]
+    test_examples = examples[:test_size]
+    val_examples = examples[test_size:test_size + val_size]
+    train_examples = examples[test_size + val_size:]
 
     return train_examples, val_examples, test_examples
 
 def save_dataset(split_name, data):
+    """
+    Saves the dataset split to a JSON Lines file.
+    """
     os.makedirs('data', exist_ok=True)
     file_path = f'./{split_name}-coding.jsonl'
     try:
@@ -151,25 +137,25 @@ def save_dataset(split_name, data):
             for example in data:
                 json.dump(example, outfile)
                 outfile.write('\n')
-        print(f"Saved {split_name} dataset with {len(data)} examples.")
+        print(f"Saved `{split_name}` dataset with {len(data)} examples.")
     except IOError as e:
         print(f"Error writing to file {file_path}: {e}")
 
 if __name__ == "__main__":
-    # Initialize tokenizer and max sequence length
-    tokenizer = AutoTokenizer.from_pretrained('mlx-community/Mistral-7B-Instruct-v0.2-4bit')
-    MAX_SEQUENCE_LENGTH = 1024  # Halved to manage memory
-
     # Load code and test snippets along with component names
     code_snippets, unit_test_snippets, component_names = load_code_and_tests()
+
+    # Generate examples with combined 'text' field
     examples = generate_examples(code_snippets, unit_test_snippets, component_names)
-    
-    # Set the number of test and validation examples
-    num_test = 10
-    num_val = 10
+
+    # Dynamically set the number of test and validation examples based on ratios
+    test_ratio = 0.1  # 10% for testing
+    val_ratio = 0.1   # 10% for validation
 
     try:
-        train_examples, val_examples, test_examples = split_dataset(examples, num_test=num_test, num_val=num_val)
+        train_examples, val_examples, test_examples = split_dataset_dynamic(
+            examples, test_ratio=test_ratio, val_ratio=val_ratio
+        )
         save_dataset('train', train_examples)
         save_dataset('valid', val_examples)
         save_dataset('test', test_examples)

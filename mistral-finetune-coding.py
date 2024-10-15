@@ -111,7 +111,7 @@ adapter_path = "adapters.npz"  # Path to the LoRA adapter
 # run_model_without_fine_tuning(prompt, max_tokens, model_path)
 
 # Fine-tune the model // run script inside
-fine_tune_model(model_path, num_iters="100", steps_per_eval="10", val_batches="-1", learning_rate="1e-5", num_layers=16, resume_adapter_file="./adapters.npz")
+fine_tune_model(model_path, num_iters="100", steps_per_eval="10", val_batches="-1", learning_rate="1e-5", num_layers=16, resume_adapter_file=None)
 
 # Run model after fine-tuning
 # run_model_after_fine_tuning(prompt, max_tokens, model_path, adapter_path)
