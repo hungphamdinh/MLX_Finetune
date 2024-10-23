@@ -104,7 +104,7 @@ model_path = "mlx-community/Mistral-7B-Instruct-v0.2-4bit"
 instructions_string = f"""CodeGPT, your role is to assist with coding problems by providing clear and accurate solutions. Your responses should be concise, technical, and helpful. Sign off each response with '-CodeGPT'."""
 prompt_builder = lambda prompt: f'''<s>[INST] {instructions_string} \n{prompt} \n[/INST]\n'''
 prompt = prompt_builder("Generate the unit test for these code <code-start>" + code + "<code-end>'")
-max_tokens = 1000
+max_tokens = 2048
 adapter_path = "adapters.npz"  # Path to the LoRA adapter
 
 # Run model without fine-tuning
