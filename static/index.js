@@ -4,7 +4,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   
   function sendMessage() {
-    console.log('haha');
     const messageInput = document.getElementById('message-input');
     const message = messageInput.value.trim();
     if (!message) return;

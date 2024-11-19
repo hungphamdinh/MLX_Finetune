@@ -1,12 +1,21 @@
+import os
 import subprocess
 from typing import List, Tuple
 from mlx_lm import load, generate
 import nltk
+import re
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction, corpus_bleu
+from colorama import init, Fore, Style  # Importing colorama components
 
-# Ensure NLTK's Punkt tokenizer is downloaded
-# nltk.download('punkt')
-# nltk.download('punkt_tab')
+# Initialize colorama
+init(autoreset=True)
+
+# Define color constants
+PRE_FINE_TUNE_COLOR = Fore.RED + Style.BRIGHT  # Red for pre-fine-tuning
+POST_FINE_TUNE_COLOR = Fore.GREEN + Style.BRIGHT  # Green for post-fine-tuning
+REFERENCE_COLOR = Fore.CYAN + Style.BRIGHT  # Cyan for reference
+RESET_COLOR = Style.RESET_ALL  # Reset to default
+
 # Function to run a shell command with live output and capture it
 def run_command_with_live_output(command: List[str]) -> Tuple[str, str]:
     """
@@ -37,30 +46,96 @@ def run_command_with_live_output(command: List[str]) -> Tuple[str, str]:
     if err_output:
         print(err_output)
         captured_stderr.append(err_output.strip())
-    
+
     return '\n'.join(captured_stdout), '\n'.join(captured_stderr)
 
 def construct_shell_command(command: List[str]) -> str:
+    """
+    Constructs a shell command string from a list of command arguments.
+
+    Args:
+        command (List[str]): The command and its arguments.
+
+    Returns:
+        str: The constructed shell command.
+    """
     return ' '.join(command)
+
+def tokenize_code(code: str) -> List[str]:
+    """
+    Tokenizes code by splitting on whitespace and retaining punctuation.
+
+    Args:
+        code (str): The code snippet to tokenize.
+
+    Returns:
+        List[str]: A list of tokens.
+    """
+    tokens = re.findall(r'\w+|[^\s\w]', code)
+    return tokens
+
+def remove_line_breaks(code: str) -> str:
+    """
+    Removes all line breaks from the given code string.
+
+    Args:
+        code (str): The code snippet from which to remove line breaks.
+
+    Returns:
+        str: The code string without any line breaks.
+    """
+    return code.replace('\n', ' ').replace('\r', ' ')
+
+def extract_code(response: str) -> str:
+    """
+    Extracts code between <code-start> and <code-end> markers.
+    
+    Args:
+        response (str): The raw response from the model.
+    
+    Returns:
+        str: The extracted code, or an empty string if markers not found.
+    """
+    match = re.search(r'Unit Test:\n<code-start>(.*?)<code-end>', response, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    else:
+        return ""
 
 def compute_bleu_score(reference: str, hypothesis: str) -> float:
     """
     Computes the BLEU score between a single reference and hypothesis.
+    Removes line breaks before tokenizing to improve BLEU scores.
 
     Args:
-        reference (str): The reference text.
-        hypothesis (str): The generated hypothesis text.
+        reference (str): The reference code.
+        hypothesis (str): The generated code.
 
     Returns:
         float: The BLEU score.
     """
-    reference_tokens = nltk.word_tokenize(reference)
-    hypothesis_tokens = nltk.word_tokenize(hypothesis)
+    # Remove line breaks from reference and hypothesis
+    reference = remove_line_breaks(reference)
+    hypothesis = remove_line_breaks(hypothesis)
+    
+    reference_tokens = tokenize_code(reference)
+    hypothesis_tokens = tokenize_code(hypothesis)
+    
+    # print("\n=== Tokenized Reference ===")
+    # print(reference_tokens)
+    
+    # print("\n=== Tokenized Hypothesis ===")
+    # print(hypothesis_tokens)
     
     # Smoothing to handle cases with no matching n-grams
     smoothie = SmoothingFunction().method4
     
-    bleu_score = sentence_bleu([reference_tokens], hypothesis_tokens, smoothing_function=smoothie)
+    bleu_score = sentence_bleu(
+        [reference_tokens], 
+        hypothesis_tokens, 
+        weights=(0.25, 0.25, 0.25, 0.25),  # BLEU-4
+        smoothing_function=smoothie
+    )
     return bleu_score
 
 def compute_corpus_bleu(references: List[str], hypotheses: List[str]) -> float:
@@ -75,8 +150,8 @@ def compute_corpus_bleu(references: List[str], hypotheses: List[str]) -> float:
         float: The corpus BLEU score.
     """
     # Tokenize references and hypotheses
-    tokenized_references = [nltk.word_tokenize(ref) for ref in references]
-    tokenized_hypotheses = [nltk.word_tokenize(hyp) for hyp in hypotheses]
+    tokenized_references = [tokenize_code(ref) for ref in references]
+    tokenized_hypotheses = [tokenize_code(hyp) for hyp in hypotheses]
     
     # Prepare references in the required format
     list_of_references = [[ref] for ref in tokenized_references]  # Each hypothesis can have multiple references
@@ -122,7 +197,7 @@ def fine_tune_model(model_path: str, num_iters: str, steps_per_eval: str, val_ba
         'python', 'scripts/lora-coding.py', '--model', model_path, '--train', 
         '--iters', num_iters, '--steps-per-eval', steps_per_eval, 
         '--val-batches', val_batches, '--learning-rate', learning_rate, 
-        '--lora-layers', str(num_layers), '--test'
+        '--lora-layers', str(num_layers), '--test',
     ]
 
     if resume_adapter_file:
@@ -130,13 +205,15 @@ def fine_tune_model(model_path: str, num_iters: str, steps_per_eval: str, val_ba
         
     print("Running command:", construct_shell_command(command))
     stdout, stderr = run_command_with_live_output(command)
-    
+
+
     # Optionally, you can save stdout and stderr to log files
     with open('logs/fine_tune.log', 'w') as log_file:
         log_file.write("STDOUT:\n")
         log_file.write(stdout)
         log_file.write("\nSTDERR:\n")
         log_file.write(stderr)
+
 
 def run_model_after_fine_tuning(prompt: str, max_tokens: int, model_path: str, adapter_path: str) -> str:
     """
@@ -165,8 +242,8 @@ def run_model_after_fine_tuning(prompt: str, max_tokens: int, model_path: str, a
         log_file.write("\nSTDERR:\n")
         log_file.write(stderr)
     
-    # Assuming the generated response is the last line of stdout
-    generated_response = stdout.strip().split('\n')[-1] if stdout else ""
+    # Extract the generated code between <code-start> and <code-end>
+    generated_response = extract_code(stdout)
     print("Generated response after fine-tuning:", generated_response)
     return generated_response
 
@@ -198,6 +275,37 @@ describe('EmptyList Component', () => {
     # Add more reference responses as needed
 ]
 
+def check_syntax(code: str) -> bool:
+    """
+    Checks the syntax of JavaScript code using ESLint.
+    Returns True if no syntax errors are found.
+
+    Args:
+        code (str): The code to check.
+
+    Returns:
+        bool: True if syntax is valid, False otherwise.
+    """
+    try:
+        # Write code to a temporary file
+        with open('temp_code.js', 'w') as f:
+            f.write(code)
+        
+        # Run ESLint
+        result = subprocess.run(['eslint', 'temp_code.js'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
+        # ESLint returns 0 if no errors
+        if result.returncode == 0:
+            print("No syntax errors found.")
+            return True
+        else:
+            print("Syntax errors detected:")
+            print(result.stdout)
+            return False
+    except Exception as e:
+        print(f"Error during syntax check: {e}")
+        return False
+
 def main():
     # Example usage:
     code = """import React from 'react';
@@ -205,18 +313,18 @@ import { Image, Text } from '@Elements';
 import { ImageResource } from '@Themes';
 import styled from 'styled-components/native';
 
-const Wrapper = styled.View`
+const Wrapper = styled.View\`
   justify-content: center;
   align-items: center;
   flex: 1;
   margin-top: 80px;
-`;
+\`;
 
-const Content = styled(Text)`
+const Content = styled(Text)\`
   color: #505e75;
   font-weight: bold;
   font-size: 13px;
-`;
+\`;
 
 const EmptyList = () => (
   <Wrapper>
@@ -235,12 +343,13 @@ export default EmptyList;
     prompt = prompt_builder("Generate a unit test for the following React Native - EmptyList component <code-start>" + code + "<code-end>'")
     max_tokens = 2000
     adapter_path = "adapters.npz"  # Path to the LoRA adapter
-    
+
     # Run model without fine-tuning
-    # print("=== Running Model Without Fine-Tuning ===")
-    # generated_response_before = run_model_without_fine_tuning(prompt, max_tokens, model_path)
-    
+    print("=== Running Model Without Fine-Tuning ===")
+    generated_response_before = run_model_without_fine_tuning(prompt, max_tokens, model_path)
+
     # Fine-tune the model
+    # Uncomment the following lines if you intend to perform fine-tuning
     # print("\n=== Fine-Tuning the Model ===")
     # fine_tune_model(
     #     model_path=model_path, 
@@ -251,25 +360,42 @@ export default EmptyList;
     #     num_layers=16, 
     #     resume_adapter_file="./adapters.npz"  # Provide path if resuming
     # )
-    
-    # Run model after fine-tuning
+
+    # # Run model after fine-tuning
     print("\n=== Running Model After Fine-Tuning ===")
     generated_response_after = run_model_after_fine_tuning(prompt, max_tokens, model_path, adapter_path)
-    
+
     # Define reference response (for this example, using the first reference)
     reference_response = reference_responses[0]
-    
-    # # Compute BLEU score for pre-fine-tuning
-    # print("\n=== Computing BLEU Score Before Fine-Tuning ===")
-    # bleu_before = compute_bleu_score(reference_response, generated_response_before)
-    # print(f"BLEU Score Before Fine-Tuning: {bleu_before:.4f}")
-    
+
+    # Print generated responses with colors
+    print("\n=== Generated Response Before Fine-Tuning ===")
+    print(f"{PRE_FINE_TUNE_COLOR}{generated_response_before}{RESET_COLOR}")
+
+    print("\n=== Generated Response After Fine-Tuning ===")
+    print(f"{POST_FINE_TUNE_COLOR}{generated_response_after}{RESET_COLOR}")
+
+    # Compute BLEU score for pre-fine-tuning
+    print("\n=== Computing BLEU Score Before Fine-Tuning ===")
+    bleu_before = compute_bleu_score(reference_response, generated_response_before)
+    print(f"BLEU Score Before Fine-Tuning: {bleu_before:.4f}")
+
     # Compute BLEU score for post-fine-tuning
     print("\n=== Computing BLEU Score After Fine-Tuning ===")
     bleu_after = compute_bleu_score(reference_response, generated_response_after)
     print(f"BLEU Score After Fine-Tuning: {bleu_after:.4f}")
-    
-    # Optionally, compute Corpus BLEU if multiple responses are available
+
+    # # Syntax Check Before Fine-Tuning
+    # print("\n=== Syntax Check Before Fine-Tuning ===")
+    # syntax_before = check_syntax(generated_response_before)
+    # print(f"Syntax Valid: {syntax_before}")
+
+    # # Syntax Check After Fine-Tuning
+    # print("\n=== Syntax Check After Fine-Tuning ===")
+    # syntax_after = check_syntax(generated_response_after)
+    # print(f"Syntax Valid: {syntax_after}")
+
+    # Optionally, compute Corpus BLEU if multiple references and hypotheses are available
     # For demonstration, we'll use the two generated responses
     # references = [reference_response, reference_response]  # Assuming two hypotheses
     # hypotheses = [generated_response_before, generated_response_after]

@@ -15,12 +15,12 @@ instructions_string = (
 )
 
 # Root directory containing your JavaScript projects
-ROOT_DIR = './training_data_2'  # Corrected path spelling from 'trainning_data' to 'training_data'
+ROOT_DIR = './training_data_3'  # Corrected path spelling from 'trainning_data' to 'training_data'
 
 # Initialize the tokenizer
 tokenizer = AutoTokenizer.from_pretrained('mlx-community/Mistral-7B-Instruct-v0.2-4bit')  # Ensure tokens do not exceed model limitations
 
-MAX_SEQUENCE_LENGTH = 1400  # Maximum tokens per 'text' entry
+MAX_SEQUENCE_LENGTH = 1500  # Maximum tokens per 'text' entry
 
 def get_basename(file_path):
     """

@@ -7,6 +7,8 @@ from mlx_lm import load, generate
 import numpy as np
 import logging
 
+#http://127.0.0.1:5000
+
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
 # Configure logging

@@ -65,7 +65,7 @@ def build_parser():
         default=16,
         help="Number of layers to fine-tune",
     )
-    parser.add_argument("--batch-size", type=int, default=4, help="Minibatch size.")
+    parser.add_argument("--batch-size", type=int, default=2, help="Minibatch size.")
     parser.add_argument(
         "--iters", type=int, default=1000, help="Iterations to train for."
     )
