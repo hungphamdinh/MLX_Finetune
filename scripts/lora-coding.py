@@ -5,6 +5,7 @@ import json
 import math
 import time
 from pathlib import Path
+import logging
 
 import mlx.core as mx
 import mlx.nn as nn
@@ -14,6 +15,22 @@ import utils as lora_utils
 from mlx.utils import tree_flatten
 from models import LoRALinear
 
+
+def setup_logging(log_file: str = "training.log"):
+    """
+    Configures the logging system.
+
+    Args:
+        log_file (str): The filename for the log output.
+    """
+    logging.basicConfig(
+        level=logging.INFO,  # Set the minimum log level to INFO
+        format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
+        handlers=[
+            logging.FileHandler(log_file),  # Log messages are written to a file
+            logging.StreamHandler()         # Log messages are also printed to the console
+        ]
+    )
 
 def build_parser():
     parser = argparse.ArgumentParser(description="LoRA or QLoRA finetuning.")
@@ -324,6 +341,7 @@ def generate(model, prompt, tokenizer, args):
 if __name__ == "__main__":
     parser = build_parser()
     args = parser.parse_args()
+    setup_logging()
 
     np.random.seed(args.seed)
 

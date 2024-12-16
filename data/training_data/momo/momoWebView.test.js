@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent } from '@testing-library/react-native';
 import { DeviceEventEmitter } from 'react-native';
 import MoMoWebView from '../../momo/momoWebView';
-import { renderScreen } from '../../../../../__mocks__/mockApp';
+import { renderScreen } from '@Mock/mockApp';
 import navigationServices from '../../../../navigator/navigationServices';
 
 describe('MoMoWebView', () => {

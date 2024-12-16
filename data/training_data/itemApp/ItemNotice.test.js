@@ -1,5 +1,5 @@
 import React from 'react';
-import { renderScreen } from '__@mocks__/mockApp';
+import { renderScreen } from '@Mock/mockApp';
 import { fireEvent } from '@testing-library/react-native';
 import { images } from '@resources/image';
 import ItemNotice from '../ItemNotice';

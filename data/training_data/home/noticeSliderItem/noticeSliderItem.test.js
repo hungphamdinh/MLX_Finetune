@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent } from '@testing-library/react-native';
-import { renderScreen } from '../../../../../__mocks__/mockApp';
+import { renderScreen } from '@Mock/mockApp';
 import NoticeSliderItem from '../../noticeSlider/noticeSliderItem';
 
 const mockItem = {

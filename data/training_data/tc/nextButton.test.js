@@ -2,7 +2,7 @@ import React from 'react';
 import { Colors } from '@themes';
 import { fireEvent } from '@testing-library/react-native';
 import NextTermButton from '../nextButton';
-import { renderScreen } from '../../../../__mocks__/mockApp';
+import { renderScreen } from '@Mock/mockApp';
 
 const onPressNextTerm = jest.fn();
 

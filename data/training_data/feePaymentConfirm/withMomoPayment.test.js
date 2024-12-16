@@ -2,7 +2,7 @@ import React from 'react';
 import Momo from '@utils/momo';
 import { Linking, DeviceEventEmitter } from 'react-native';
 import withMomoPayment from '../../feePaymentConfirm/paymentHOC/withMoMoPayment'; // Adjust the import path
-import { renderScreen } from '../../../../../__mocks__/mockApp';
+import { renderScreen } from '@Mock/mockApp';
 
 jest.mock('@utils/momo', () => ({
   ensureExistedMomoApp: jest.fn(),

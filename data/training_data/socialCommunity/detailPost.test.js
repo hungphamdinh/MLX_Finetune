@@ -1,6 +1,6 @@
 import React from 'react';
-import { renderScreen } from '__@mocks__/mockApp';
-import mockNavigation from '__@mocks__/mockNavigation';
+import { renderScreen } from '@Mock/mockApp';
+import mockNavigation from '@Mock/mockNavigation';
 import DetailPost from '../index';
 
 const mockActions = {

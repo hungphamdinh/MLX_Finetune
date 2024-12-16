@@ -1,5 +1,5 @@
 import React from 'react';
-import { renderScreen } from '__@mocks__/mockApp'; // Import your custom renderScreen function
+import { renderScreen } from '@Mock/mockApp'; // Import your custom renderScreen function
 import PostRejected from '../detailPost/PostRejected'; // Adjust the import path as necessary
 
 describe('PostRejected', () => {

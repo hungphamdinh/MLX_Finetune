@@ -1,5 +1,5 @@
 import React from 'react';
-import { renderScreen } from '__@mocks__/mockApp';
+import { renderScreen } from '@Mock/mockApp';
 import DeviceItem from '../../deviceList/deviceItem';
 
 describe('DeviceItem', () => {

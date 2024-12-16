@@ -6,6 +6,7 @@ import nltk
 import re
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction, corpus_bleu
 from colorama import init, Fore, Style  # Importing colorama components
+from codebleu import calc_codebleu
 
 # Initialize colorama
 init(autoreset=True)
@@ -96,7 +97,7 @@ def extract_code(response: str) -> str:
     Returns:
         str: The extracted code, or an empty string if markers not found.
     """
-    match = re.search(r'Unit Test:\n<code-start>(.*?)<code-end>', response, re.DOTALL)
+    match = re.search(r'<code-end>(.*)', response, re.DOTALL)
     if match:
         return match.group(1).strip()
     else:
@@ -250,25 +251,29 @@ def run_model_after_fine_tuning(prompt: str, max_tokens: int, model_path: str, a
 # Define reference responses (Replace these with your actual references)
 reference_responses = [
     """import React from 'react';
-import { render } from '@testing-library/react-native';
-import EmptyList from '../../../Inspection/AttachImageScreen/EmptyList';
-import { ImageResource } from '../../../../../Themes';
+import { render, fireEvent, act } from '@testing-library/react-native';
+import CredentialsModal from '../CredentialsModal';
 
-describe('EmptyList Component', () => {
-  it('renders correctly', () => {
-    render(<EmptyList />);
+describe('BiometricScreen', () => {
+  test('render', () => {
+    const { getByText } = render(<CredentialsModal />);
+
+    expect(getByText('LOGIN_PASSWORD')).toBeTruthy();
+    expect(getByText('LOGIN_USERNAME')).toBeTruthy();
+    expect(getByText('ENABLE_BIOMETRIC')).toBeTruthy();
   });
+  test('submit button triggers onSubmit function with correct values', () => {
+    const onClosePress = jest.fn();
+    const { getByText } = render(<CredentialsModal onClosePress={onClosePress} />);
 
-  it('renders image correctly', () => {
-    const { getByTestId } = render(<EmptyList />);
-    const image = getByTestId('image');
-    expect(image.props.source).toBe(ImageResource.IMG_LIBRARY_EMPTY);
-  });
+    const passwordInput = getByText('LOGIN_PASSWORD');
+    const submitButton = getByText('ENABLE_BIOMETRIC');
+    act(() => {
+      fireEvent.changeText(passwordInput, 'password123');
+    });
 
-  it('renders text correctly', () => {
-    const { getByTestId } = render(<EmptyList />);
-    const text = getByTestId('text');
-    expect(text.props.children).toBe('AD_EFORM_NO_IMAGES_AVAILABLE');
+    fireEvent.press(submitButton);
+    expect(onClosePress).toBeTruthy();
   });
 });
 """,
@@ -309,38 +314,112 @@ def check_syntax(code: str) -> bool:
 def main():
     # Example usage:
     code = """import React from 'react';
-import { Image, Text } from '@Elements';
-import { ImageResource } from '@Themes';
-import styled from 'styled-components/native';
+    import { FormProvider } from 'react-hook-form';
+    import I18n from '@I18n';
+    import * as Yup from 'yup';
+    import styled from 'styled-components/native';
+    import { Button } from '../../../Elements';
+    import { FormInput } from '../../Forms';
+    import { withModal } from '../../../HOC';
+    import { useCompatibleForm, useYupValidationResolver } from '../../../Utils/hook';
+    import { icons } from '../../../Resources/icon';
+    import useUser from '../../../Context/User/Hooks/UseUser';
+    import { BIOMETRIC_STATUS } from '../../../Config/Constants';
 
-const Wrapper = styled.View\`
-  justify-content: center;
-  align-items: center;
-  flex: 1;
-  margin-top: 80px;
-\`;
+    const ButtonWrapper = styled.View`
+    align-items: center;
+    margin-top: 10px;
+    `;
 
-const Content = styled(Text)\`
-  color: #505e75;
-  font-weight: bold;
-  font-size: 13px;
-\`;
+    const Wrapper = styled.View`
+    padding-horizontal: 10px;
+    `;
 
-const EmptyList = () => (
-  <Wrapper>
-    <Image testID="image" source={ImageResource.IMG_LIBRARY_EMPTY} />
-    <Content testID="text" text="AD_EFORM_NO_IMAGES_AVAILABLE" />
-  </Wrapper>
-);
+    const InputIcon = styled.Image`
+    margin-right: 10px;
+    `;
 
-export default EmptyList;
-"""
+    const CredentialsModal = ({ onSuccess }) => {
+    const {
+        user: { user },
+        checkAuthenticate,
+        updateUserBiometric,
+    } = useUser();
 
-    # Parameters
+    const requiredQuestion = I18n.t('AUTH_REQUIRED_FIELD');
+    const validationSchema = Yup.object().shape({
+        password: Yup.string().required(requiredQuestion),
+    });
+    const formMethods = useCompatibleForm({
+        resolver: useYupValidationResolver(validationSchema),
+        defaultValues: {
+        username: user.emailAddress,
+        password: '',
+        },
+    });
+
+    const onSubmit = async (values) => {
+        const response = await checkAuthenticate(values);
+        if (response) {
+        updateUserBiometric(BIOMETRIC_STATUS.ON);
+        onSuccess();
+        }
+    };
+
+    return (
+        <Wrapper>
+        <FormProvider {...formMethods}>
+            <FormInput
+            name="username"
+            mode="small"
+            keyboardType="email-address"
+            label="LOGIN_USERNAME"
+            editable={false}
+            placeholder="LOGIN_USERNAME"
+            />
+            <FormInput
+            name="password"
+            secureTextEntry
+            mode="small"
+            label="LOGIN_PASSWORD"
+            placeholder="LOGIN_PASSWORD"
+            leftIcon={<InputIcon source={icons.password} />}
+            />
+            <ButtonWrapper center>
+            <Button
+                block
+                primary
+                rounded
+                title={I18n.t('ENABLE_BIOMETRIC')}
+                onPress={formMethods.handleSubmit(onSubmit)}
+            />
+            </ButtonWrapper>
+        </FormProvider>
+        </Wrapper>
+    );
+    };
+
+    export default withModal(CredentialsModal, 'CREDENTIALS_TITLE');
+    """
+
     model_path = "mlx-community/Mistral-7B-Instruct-v0.2-4bit"
-    instructions_string = f"""CodeGPT, your role is to assist with coding problems by providing clear and accurate solutions. Your responses should be concise, technical, and helpful. Sign off each response with '-CodeGPT'."""
-    prompt_builder = lambda prompt: f'''<s>[INST] {instructions_string} \n{prompt} \n[/INST]\n'''
-    prompt = prompt_builder("Generate a unit test for the following React Native - EmptyList component <code-start>" + code + "<code-end>'")
+    instructions_string = (
+        "CodeGPT, functioning as a coding support assistant, communicates in clear, accessible language "
+        "and can provide deeper technical details upon request. It responds to feedback appropriately and "
+        "concludes responses with its signature '–CodeGPT'. CodeGPT also specializes in generating unit tests "
+        "for JavaScript and React Native code using Jest and React Testing Library, ensuring tests cover various "
+        "scenarios and follow best practices. It tailors the length of its responses according to the user's prompts, "
+        "keeping interactions both helpful and natural."
+    )
+
+    def prompt_builder(prompt_content):
+        return f"<s>[INST] {instructions_string}\n{prompt_content}\n[/INST]\n–CodeGPT</s>"
+
+    # Example usage:
+    prompt = prompt_builder(
+        "Generate a unit test for the following React Native component (`CredentialsModal`)\n"
+        "<code-start>" + code + "<code-end>"
+    )
     max_tokens = 2000
     adapter_path = "adapters.npz"  # Path to the LoRA adapter
 
@@ -384,23 +463,15 @@ export default EmptyList;
     print("\n=== Computing BLEU Score After Fine-Tuning ===")
     bleu_after = compute_bleu_score(reference_response, generated_response_after)
     print(f"BLEU Score After Fine-Tuning: {bleu_after:.4f}")
+    
+    code_bleu_before = calc_codebleu([reference_response], [generated_response_before], lang="python", weights=(0.25, 0.25, 0.25, 0.25), tokenizer=None)
+    print(f"CODE_BLEU Score before Fine-Tuning")
+    print(code_bleu_before)
 
-    # # Syntax Check Before Fine-Tuning
-    # print("\n=== Syntax Check Before Fine-Tuning ===")
-    # syntax_before = check_syntax(generated_response_before)
-    # print(f"Syntax Valid: {syntax_before}")
+    code_bleu_after = calc_codebleu([reference_response], [generated_response_after], lang="python", weights=(0.25, 0.25, 0.25, 0.25), tokenizer=None)
+    print(f"CODE_BLEU Score After Fine-Tuning")
+    print(code_bleu_after)
 
-    # # Syntax Check After Fine-Tuning
-    # print("\n=== Syntax Check After Fine-Tuning ===")
-    # syntax_after = check_syntax(generated_response_after)
-    # print(f"Syntax Valid: {syntax_after}")
-
-    # Optionally, compute Corpus BLEU if multiple references and hypotheses are available
-    # For demonstration, we'll use the two generated responses
-    # references = [reference_response, reference_response]  # Assuming two hypotheses
-    # hypotheses = [generated_response_before, generated_response_after]
-    # corpus_bleu = compute_corpus_bleu(references, hypotheses)
-    # print(f"\nCorpus BLEU Score: {corpus_bleu:.4f}")
 
 if __name__ == "__main__":
     main()

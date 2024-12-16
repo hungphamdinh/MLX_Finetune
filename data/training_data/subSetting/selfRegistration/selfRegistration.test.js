@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent } from '@testing-library/react-native';
 import SelfRegistrationSetting from '../../../subSetting/selfRegistration';
-import { renderScreen } from '../../../../../../__mocks__/mockApp';
+import { renderScreen } from '@Mock/mockApp';
 import navigationServices from '../../../../../navigator/navigationServices';
 
 const mockStore = {

@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, act } from '@testing-library/react-native';
 import Visitor from '../index';
-import { renderScreen } from '../../../../__mocks__/mockApp';
+import { renderScreen } from '@Mock/mockApp';
 import NavigationServices from '../../../navigator/navigationServices';
-import { mockList } from '../../../../__mocks__/mockStore';
+import { mockList } from '@Mock/mockStore';
 
 describe('Visitor screen', () => {
   const renderVisitor = () => renderScreen(<Visitor />)();

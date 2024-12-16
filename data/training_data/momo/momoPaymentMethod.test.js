@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent } from '@testing-library/react-native';
 import MoMoPaymentMethod from '../../momo/momoPaymentMethod';
-import { renderScreen } from '../../../../../__mocks__/mockApp';
+import { renderScreen } from '@Mock/mockApp';
 
 const store = {
   app: {
