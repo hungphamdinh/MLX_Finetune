@@ -142,22 +142,48 @@ def build_parser():
 
 class Dataset:
     """
-    Light-weight wrapper to hold lines from a jsonl file
+    Light-weight wrapper to hold and process lines from a jsonl file with 'messages'.
+    Each data point consists of a list of messages, each with a 'role' and 'content'.
+    This class converts the list of messages into a single formatted string.
     """
 
-    def __init__(self, path: Path, key: str = "text"):
+    def __init__(self, path: Path, roles=("user", "assistant"), separator="\n"):
         if not path.exists():
             self._data = None
         else:
             with open(path, "r") as fid:
                 self._data = [json.loads(l) for l in fid]
-        self._key = key
+        self._roles = roles
+        self._separator = separator
 
     def __getitem__(self, idx: int):
-        return self._data[idx][self._key]
+        messages = self._data[idx].get("messages", [])
+        formatted_message = self.format_messages(messages)
+        return formatted_message
 
     def __len__(self):
         return len(self._data)
+
+    @staticmethod
+    def format_messages(messages, roles=("user", "assistant"), separator="\n"):
+        """
+        Formats a list of messages into a single string with role prefixes.
+
+        Args:
+            messages (list): List of message dicts with 'role' and 'content'.
+            roles (tuple): Roles to include and their order.
+            separator (str): Separator between messages.
+
+        Returns:
+            str: Formatted conversation string.
+        """
+        formatted = []
+        for message in messages:
+            role = message.get("role", "").lower()
+            content = message.get("content", "")
+            if role in roles:
+                formatted.append(f"{role}: {content}")
+        return separator.join(formatted)
 
 
 def load(args):
@@ -169,6 +195,7 @@ def load(args):
             print(f"Unable to build dataset {dataset_path} ({e})")
             raise
 
+    # Updated dataset names to match the new structure
     names = ("train-coding", "valid-coding", "test-coding")
     train, valid, test = (load_and_check(n) for n in names)
 
@@ -234,7 +261,7 @@ def iterate_batches(dset, tokenizer, batch_size, train=False):
             break
 
 
-def evaluate(model, dataset, loss, tokenizer, batch_size, num_batches):
+def evaluate(model, dataset, loss_fn, tokenizer, batch_size, num_batches):
     all_losses = []
     ntokens = 0
 
@@ -245,16 +272,16 @@ def evaluate(model, dataset, loss, tokenizer, batch_size, num_batches):
         index_iterator,
         iterate_batches(dataset, tokenizer, batch_size),
     ):
-        losses, toks = loss(model, *batch)
+        losses, toks = loss_fn(model, *batch)
         all_losses.append((losses * toks).item())
         ntokens += toks.item()
 
     return np.sum(all_losses) / ntokens
 
 
-def train(model, train_set, val_set, optimizer, loss, tokenizer, args):
+def train(model, train_set, val_set, optimizer, loss_fn, tokenizer, args):
     # Create value and grad function for loss
-    loss_value_and_grad = nn.value_and_grad(model, loss)
+    loss_value_and_grad = nn.value_and_grad(model, loss_fn)
 
     losses = []
     n_tokens = 0
@@ -294,7 +321,7 @@ def train(model, train_set, val_set, optimizer, loss, tokenizer, args):
         if it == 0 or (it + 1) % args.steps_per_eval == 0:
             stop = time.perf_counter()
             val_loss = evaluate(
-                model, val_set, loss, tokenizer, args.batch_size, args.val_batches
+                model, val_set, loss_fn, tokenizer, args.batch_size, args.val_batches
             )
             print(
                 f"Iter {it + 1}: "

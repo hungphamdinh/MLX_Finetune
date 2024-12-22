@@ -17,6 +17,23 @@ POST_FINE_TUNE_COLOR = Fore.GREEN + Style.BRIGHT  # Green for post-fine-tuning
 REFERENCE_COLOR = Fore.CYAN + Style.BRIGHT  # Cyan for reference
 RESET_COLOR = Style.RESET_ALL  # Reset to default
 
+instructions_string = (
+    "You are CodeGPT, an AI assistant specializing in generating unit tests for JavaScript and React Native code. "
+    "Provide clear, concise, and correct unit tests using Jest and React Testing Library. "
+    "Ensure the tests cover various cases and follow best practices."
+)
+
+def prompt_builder(user_message: str) -> str:
+    """
+    Constructs the prompt by combining instructions with the user message.
+
+    Args:
+        user_message (str): The message provided by the user.
+
+    Returns:
+        str: The complete prompt for the model.
+    """
+    return f"{instructions_string}\nUser: {user_message}\nAssistant:"
 # Function to run a shell command with live output and capture it
 def run_command_with_live_output(command: List[str]) -> Tuple[str, str]:
     """
@@ -97,7 +114,7 @@ def extract_code(response: str) -> str:
     Returns:
         str: The extracted code, or an empty string if markers not found.
     """
-    match = re.search(r'<code-end>(.*)', response, re.DOTALL)
+    match = re.search(r'unit test(.*)', response, re.DOTALL)
     if match:
         return match.group(1).strip()
     else:
@@ -121,12 +138,6 @@ def compute_bleu_score(reference: str, hypothesis: str) -> float:
     
     reference_tokens = tokenize_code(reference)
     hypothesis_tokens = tokenize_code(hypothesis)
-    
-    # print("\n=== Tokenized Reference ===")
-    # print(reference_tokens)
-    
-    # print("\n=== Tokenized Hypothesis ===")
-    # print(hypothesis_tokens)
     
     # Smoothing to handle cases with no matching n-grams
     smoothie = SmoothingFunction().method4
@@ -403,23 +414,8 @@ def main():
     """
 
     model_path = "mlx-community/Mistral-7B-Instruct-v0.2-4bit"
-    instructions_string = (
-        "CodeGPT, functioning as a coding support assistant, communicates in clear, accessible language "
-        "and can provide deeper technical details upon request. It responds to feedback appropriately and "
-        "concludes responses with its signature '–CodeGPT'. CodeGPT also specializes in generating unit tests "
-        "for JavaScript and React Native code using Jest and React Testing Library, ensuring tests cover various "
-        "scenarios and follow best practices. It tailors the length of its responses according to the user's prompts, "
-        "keeping interactions both helpful and natural."
-    )
-
-    def prompt_builder(prompt_content):
-        return f"<s>[INST] {instructions_string}\n{prompt_content}\n[/INST]\n–CodeGPT</s>"
-
-    # Example usage:
-    prompt = prompt_builder(
-        "Generate a unit test for the following React Native component (`CredentialsModal`)\n"
-        "<code-start>" + code + "<code-end>"
-    )
+    # Use the centralized prompt builder
+    prompt = prompt_builder(code)
     max_tokens = 2000
     adapter_path = "adapters.npz"  # Path to the LoRA adapter
 
@@ -440,7 +436,7 @@ def main():
     #     resume_adapter_file="./adapters.npz"  # Provide path if resuming
     # )
 
-    # # Run model after fine-tuning
+    # Run model after fine-tuning
     print("\n=== Running Model After Fine-Tuning ===")
     generated_response_after = run_model_after_fine_tuning(prompt, max_tokens, model_path, adapter_path)
 

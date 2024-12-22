@@ -7,7 +7,24 @@ from mlx_lm import load, generate
 import numpy as np
 import logging
 
-#http://127.0.0.1:5000
+instructions_string = (
+    "You are CodeGPT, an AI assistant specializing in generating unit tests for JavaScript and React Native code. "
+    "Provide clear, concise, and correct unit tests using Jest and React Testing Library. "
+    "Ensure the tests cover various cases and follow best practices."
+)
+
+def prompt_builder(user_message: str) -> str:
+    """
+    Constructs the prompt by combining instructions with the user message.
+
+    Args:
+        user_message (str): The message provided by the user.
+
+    Returns:
+        str: The complete prompt for the model.
+    """
+    return f"{instructions_string}\nUser: {user_message}\nAssistant:"
+# http://127.0.0.1:5000
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 
@@ -84,13 +101,8 @@ def chat():
         logger.warning("No message provided in the request.")
         return jsonify({'error': 'No message provided'}), 400
 
-    # Build the prompt
-    instructions = (
-        "You are CodeGPT, an AI assistant specializing in generating unit tests for JavaScript "
-        "and React Native code. Provide clear, concise, and correct unit tests using Jest and React Testing Library. "
-        "Ensure the tests cover various cases and follow best practices."
-    )
-    prompt = f"{instructions}\nUser: {user_message}\nAssistant:"
+    # Build the prompt using the centralized prompt builder
+    prompt = prompt_builder(user_message)
 
     logger.info(f"Received user message: {user_message}")
     logger.debug(f"Built prompt: {prompt}")
